@@ -1,0 +1,42 @@
+
+# Server
+PORT=8000
+
+# Database
+DATABASE_URL=postgresql://loopsync:loopsync@localhost:5432/loopsync-pro
+
+# JWT
+JWT_SECRET=super-secret-jwt-key-change-in-production
+JWT_EXPIRES_IN=900s
+JWT_REFRESH_SECRET=super-secret-refresh-key-change-in-production
+JWT_REFRESH_EXPIRES_IN=7d
+
+# Google OAuth
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# OpenAI API
+OPENAI_API_KEY=
+
+# SMTP (Zoho)
+SMTP_HOST=smtp.zoho.in
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=noreply@loopsync.cloud
+SMTP_PASSWORD=
+SMTP_FROM="LoopSync Cloud Console <noreply@loopsync.cloud>"
+
+# Razorpay
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+LOOPSYNC_RZP_WEBHOOK_SECRET=
+
+# AWS
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=ap-south-1
+AWS_S3_BUCKET_NAME=
+
+# Testing override via env (rupees): PRICE_TEST_MONTHLY_RUPEES, PRICE_TEST_ANNUAL_RUPEES
+PRICE_TEST_MONTHLY_RUPEES=4
+PRICE_TEST_ANNUAL_RUPEES=5

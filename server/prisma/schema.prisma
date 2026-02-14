@@ -1,0 +1,427 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+}
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  BANNED
+}
+
+enum AccountType {
+  VISITOR
+  CUSTOMER
+}
+
+model User {
+  id                String   @id @default(cuid())
+  fullName          String
+  email             String   @unique
+  passwordHash      String?
+  provider          AuthProvider
+  googleId          String?  @unique
+  status            UserStatus
+  accountType       AccountType
+  onboard           Boolean  @default(false)
+  trialNotify       Boolean  @default(false)
+  credits           Int      @default(0)
+  trialCreditsClaimed Boolean @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  emailOtps         EmailOtp[]
+  subscriptions     Subscription[]
+  userFeatureOverrides UserFeatureOverride[]
+  refreshTokenHash  String?
+  paymentMethods    PaymentMethod[]
+  billingAddresses  BillingAddress[]
+  invoices          Invoice[]
+  reviews           Review[]
+}
+
+enum BillingCycle {
+  MONTHLY
+  ANNUAL
+}
+
+model Plan {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  price       Int
+  currency    String
+  billingCycle BillingCycle
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  planFeatures PlanFeature[]
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                      String @id @default(cuid())
+  userId                  String
+  planId                  String
+  user                    User @relation(fields: [userId], references: [id])
+  plan                    Plan @relation(fields: [planId], references: [id])
+  status                  SubscriptionStatus
+  startedAt               DateTime
+  expiresAt               DateTime
+  autoRenew               Boolean @default(true)
+  paymentProvider         String
+  providerSubscriptionId  String?
+  providerPaymentId       String?
+  cancelAt                DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+  PAST_DUE
+}
+
+enum FeatureDataType {
+  BOOLEAN
+  NUMBER
+}
+
+model Feature {
+  id          String @id @default(cuid())
+  key         String @unique
+  label       String
+  description String?
+  dataType    FeatureDataType
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  planFeatures PlanFeature[]
+  userOverrides UserFeatureOverride[]
+}
+
+model PlanFeature {
+  id        String @id @default(cuid())
+  planId    String
+  featureId String
+  enabled   Boolean?
+  value     Int?
+  plan      Plan @relation(fields: [planId], references: [id])
+  feature   Feature @relation(fields: [featureId], references: [id])
+
+  @@unique([planId, featureId])
+}
+
+model UserFeatureOverride {
+  id        String @id @default(cuid())
+  userId    String
+  featureId String
+  enabled   Boolean?
+  value     Int?
+  user      User @relation(fields: [userId], references: [id])
+  feature   Feature @relation(fields: [featureId], references: [id])
+
+  @@unique([userId, featureId])
+}
+
+model EmailOtp {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  code      String
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model EligibleEmail {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PaymentMethod {
+  id              String       @id @default(cuid())
+  userId          String
+  user            User         @relation(fields: [userId], references: [id])
+  type            String       // e.g., 'razorpay', 'upi', 'netbanking'
+  providerDetails Json         // Store provider-specific details
+  isDefault       Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([userId])
+}
+
+model BillingAddress {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  addressLine1  String
+  addressLine2  String?
+  city          String?
+  state         String
+  country       String
+  pinCode       String
+  phoneNumber   String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@index([phoneNumber])
+}
+
+enum InvoiceType {
+  SINGLE_PURCHASE
+  SUBSCRIPTION
+  REFUND
+  CONTRIBUTION
+}
+
+enum InvoiceStatus {
+  PAID
+  FAILED
+  PENDING
+}
+
+
+model Invoice {
+  id                 String         @id @default(cuid())
+  invoiceNumber      String         @unique
+  userId             String
+  user               User           @relation(fields: [userId], references: [id])
+  type               InvoiceType
+  amount             Int
+  currency           String
+  status             InvoiceStatus
+  paymentProvider    String?
+  paymentReferenceId String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+enum DeveloperStatus {
+  PENDING_PAYMENT
+  ACTIVE
+}
+
+enum DeveloperPaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model Developer {
+  id               String          @id @default(cuid())
+  fullName         String
+  email            String          @unique
+  passwordHash     String
+  role             String          @default("DEVELOPER")
+  status           DeveloperStatus
+  verifiedBadge    Boolean         @default(false)
+  license          String?
+  refreshTokenHash String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  paymentOrders DeveloperPaymentOrder[]
+  apiKeys       DeveloperApiKey[]
+
+  // Profile Settings
+  bio         String?
+  avatarUrl   String?
+  visibility  String  @default("public") // "public" or "private"
+
+  apps        App[]
+
+  // Notification Preferences
+  deploymentStatus Boolean @default(true)
+  payoutUpdates    Boolean @default(true)
+  marketingEmails  Boolean @default(false)
+
+  // Banking & Payouts
+  bankName        String?
+  accountHolder   String?
+  accountNumber   String? // In a real app, this should be encrypted
+  ifsc            String?
+
+  // Tax & Billing
+  gstin           String?
+  pan             String?
+  panCardUrl      String? // URL to the uploaded PAN card image
+  billingAddress  String?
+  taxVerified     Boolean @default(false)
+
+  // Payout Schedule
+  payoutScheduleType String @default("automatic")
+  payoutCycle        String @default("monthly")
+  payoutDay          Int    @default(1)
+}
+
+model DeveloperPaymentOrder {
+  id          String                 @id @default(cuid())
+  developerId String
+  developer   Developer              @relation(fields: [developerId], references: [id])
+  orderId     String                 @unique
+  amount      Float
+  currency    String
+  status      DeveloperPaymentStatus @default(PENDING)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+}
+
+model DeveloperApiKey {
+  id          String    @id @default(cuid())
+  developerId String
+  developer   Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  type        String    // "production" | "test"
+  prefix      String    // Store first few chars for display
+  keyHash     String    // Securely stored hash
+  status      String    @default("active") // "active" | "disabled"
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([developerId])
+}
+
+model App {
+  id          String    @id @default(cuid())
+  developerId String
+  developer   Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  name        String
+  status      String    @default("draft") // draft, review, live, rejected, terminated
+  visibility  String    @default("public") // public, unlisted, private
+  color       String    @default("bg-white")
+  users       Int       @default(0)
+  
+  // Metadata
+  version          String?
+  category         String?
+  customCategory   String?
+  tags             String[]
+  platforms        String[]
+  shortDescription String?
+  fullDescription  String?
+  website          String?
+  supportEmail     String?
+  
+  // Pricing
+  pricingModel     String?   @default("free") // free, paid, sub
+  price            Float?    @default(0)
+  
+  // Distribution
+  distributionMode    String?   @default("global") // global, manual
+  distributionRegions String[]
+
+  // Assets
+  bannerUrl       String?
+  videoUrl        String?
+  icons           Json?     // { "512": "...", "144": ... }
+  screenshots     String[]
+  
+  // Build & Verification
+  verifyKey       String?
+  buildUrl        String?
+  buildSize       Int?
+  rejectionReason String?
+  
+  // Reviewer Info
+  reviewerInfo       Json?     // Nested object with test credentials, notes, etc.
+  reviewerDeclaration Boolean? @default(false)
+
+  
+  // Store Info & Privacy
+  privacyTracking String[] // Identifiers, Usage Data, etc.
+  privacyLinked   String[] // Purchases, Location, etc.
+  ageRating       String?  @default("4+")
+  copyright       String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  history     AppHistory[]
+  builds      Build[]
+  currentBuildId String?
+  currentBuild   Build?    @relation("CurrentBuild", fields: [currentBuildId], references: [id])
+  publishedAt DateTime?
+
+  reviews     Review[]
+
+  @@index([developerId])
+}
+
+model Build {
+  id        String   @id @default(cuid())
+  appId     String
+  app       App      @relation(fields: [appId], references: [id], onDelete: Cascade)
+  currentForApp App[] @relation("CurrentBuild")
+  version   String
+  status    String   @default("pending") // pending, approved, rejected
+  isActive  Boolean  @default(false)
+  platforms Json?    // { "windows": { "buildId": "...", "sizeMB": 120 } }
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([appId])
+}
+
+model AppHistory {
+  id        String   @id @default(cuid())
+  appId     String
+  app       App      @relation(fields: [appId], references: [id], onDelete: Cascade)
+  action    String
+  reason    String?
+  createdAt DateTime @default(now())
+  
+  @@index([appId])
+}
+
+model Admin {
+  id               String   @id @default(cuid())
+  fullName         String
+  email            String   @unique
+  passwordHash     String
+  role             String   @default("ADMIN")
+  refreshTokenHash String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+
+
+
+model Review {
+  id        String   @id @default(cuid())
+  appId     String
+  app       App      @relation(fields: [appId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int
+  title     String
+  content   String   @db.Text
+  userName  String?  // Snapshot or fallback
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([appId])
+  @@index([userId])
+}
